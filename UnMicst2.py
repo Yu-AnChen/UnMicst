@@ -87,7 +87,7 @@ class UNet2D:
 				ldXWeightsExtra = []
 				for i in range(nExtraConvs):
 					ldXWeightsExtra.append(
-						tf.get_variable(initializer=tf.compat.v1.keras.initializers.VarianceScaling(mode='fan_in'),
+						tf.get_variable(initializer=tf.keras.initializers.VarianceScaling(mode='fan_in'),
 										shape=[UNet2D.hp['ks'], UNet2D.hp['ks'], nOutX[index + 1], nOutX[index + 1]],
 										name='kernelExtra%d' % i))
 					# ldXWeightsExtra.append(tf.Variable(
@@ -98,7 +98,7 @@ class UNet2D:
 				for i in range(nExtraConvs):
 					c00 = tf.nn.conv2d(tf.nn.leaky_relu(c00), ldXWeightsExtra[i], strides=[1, 1, 1, 1], padding='SAME')
 
-				ldXWeightsShortcut = tf.get_variable(initializer=tf.compat.v1.keras.initializers.VarianceScaling(mode='fan_in'),
+				ldXWeightsShortcut = tf.get_variable(initializer=tf.keras.initializers.VarianceScaling(mode='fan_in'),
 													 shape=[UNet2D.hp['ks'], UNet2D.hp['ks'], nOutX[index],
 															nOutX[index + 1]],
 													 name='shortcutWeights', regularizer=regularizer)
@@ -118,7 +118,7 @@ class UNet2D:
 
 		with tf.variable_scope('lb'):
 			regularizer = tf.keras.regularizers.l2(0.01)
-			lbWeights1 = tf.get_variable(initializer=tf.compat.v1.keras.initializers.VarianceScaling(mode='fan_in'),
+			lbWeights1 = tf.get_variable(initializer=tf.keras.initializers.VarianceScaling(mode='fan_in'),
 										 shape=[UNet2D.hp['ks'], UNet2D.hp['ks'], nOutX[UNet2D.hp['nLayers']],
 												nOutX[UNet2D.hp['nLayers'] + 1]],
 										 name='kernel1', regularizer=regularizer)
@@ -154,17 +154,17 @@ class UNet2D:
 			with tf.variable_scope('lu%d' % index):
 				regularizer = tf.keras.regularizers.l2(0.005)
 				luXWeights1 = tf.get_variable(
-					initializer=tf.compat.v1.keras.initializers.VarianceScaling(mode='fan_in'),
+					initializer=tf.keras.initializers.VarianceScaling(mode='fan_in'),
 					shape=[UNet2D.hp['ks'], UNet2D.hp['ks'], nOutX[index + 1], nOutX[index + 2]],
 					name='kernelU%d' % index,regularizer=regularizer)
 				luXWeights2 = tf.get_variable(
-					initializer=tf.compat.v1.keras.initializers.VarianceScaling(mode='fan_in'),
+					initializer=tf.keras.initializers.VarianceScaling(mode='fan_in'),
 					shape=[UNet2D.hp['ks'], UNet2D.hp['ks'], nOutX[index] + nOutX[index + 1], nOutX[index + 1]],
 					name='kernel2',regularizer=regularizer)
 				luXWeightsExtra = []
 				for i in range(nExtraConvs):
 					luXWeightsExtra.append(tf.get_variable(
-						initializer=tf.compat.v1.keras.initializers.VarianceScaling(mode='fan_in'),
+						initializer=tf.keras.initializers.VarianceScaling(mode='fan_in'),
 						shape=[UNet2D.hp['ks'], UNet2D.hp['ks'], nOutX[index + 1], nOutX[index + 1]],
 						name='kernel2Extra%d' % i))
 				# luXWeights1 = tf.Variable(
@@ -207,7 +207,7 @@ class UNet2D:
 		with tf.variable_scope('lt'):
 			regularizer = tf.keras.regularizers.l2(0.005)
 			# ltWeights1 = tf.Variable(tf.truncated_normal([1, 1, nOutX[1], nClasses], stddev=stdDev0), name='kernel')
-			ltWeights1 = tf.get_variable(initializer=tf.compat.v1.keras.initializers.VarianceScaling(mode='fan_in'),
+			ltWeights1 = tf.get_variable(initializer=tf.keras.initializers.VarianceScaling(mode='fan_in'),
 										 shape=[1, 1, nOutX[1], nClasses],
 										 name='kernel',regularizer=regularizer)
 			def lt(hidden):
@@ -357,7 +357,7 @@ class UNet2D:
 		learningRate = tf.train.exponential_decay(learningRate0, globalStep, decaySteps, decayRate, staircase=True)
 
 		with tf.name_scope('optim'):
-			l2_loss = tf.compat.v1.losses.get_regularization_loss()
+			l2_loss = tf.losses.get_regularization_loss()
 			loss = tf.reduce_mean(-tf.reduce_sum(tf.multiply(tf.cast(tfWeights, tf.float32),
 															 tf.multiply(tf.cast(tfLabels, tf.float32),
 																		 tf.log(UNet2D.nn))), 3)) + l2_loss
@@ -741,11 +741,13 @@ if __name__ == '__main__':
 	parentFolder = os.path.dirname(os.path.dirname(imagePath))
 	fileName = os.path.basename(imagePath)
 	fileNamePrefix = fileName.split(os.extsep, 1)
+	# fileNamePrefix = fileName.split(os.extsep)
 	print(fileName)
 	fileType = fileNamePrefix[1]
+	# fileType = fileNamePrefix[-1]
 
 	for iChan in range(len(channel)):
-		if fileType=='ome.tif' or fileType == 'btf' :
+		if fileType=='ome.tif' or fileType == 'btf' or fileType=='ome.tiff':
 			I = skio.imread(imagePath, img_num=int(channel[iChan]),plugin='tifffile')
 		elif fileType == 'tif' :
 			I = tifffile.imread(imagePath, key=int(channel[iChan]))
@@ -761,7 +763,8 @@ if __name__ == '__main__':
 		hsize = int((float(I.shape[0]) * float(dsFactor)))
 		vsize = int((float(I.shape[1]) * float(dsFactor)))
 		I = resize(I, (hsize, vsize))
-		I = im2double(sk.rescale_intensity(I, in_range=(np.min(I), np.max(I)), out_range=(0, 0.983)))
+		I = im2double(sk.rescale_intensity(I, in_range=(np.min(I), np.percentile(I, 99.5)), out_range=(0, 0.983)))
+		print(I.min(), I.max())
 		cells[iChan, :, :] = I
 	rawI = cells[0,:,:]
 	if args.classOrder == -1:
